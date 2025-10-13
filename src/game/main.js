@@ -4,7 +4,7 @@ import { AUTO, Scale, Game } from 'phaser';
 // Find out more information about the Game Config at:
 // https://docs.phaser.io/api-documentation/typedef/types-core#gameconfig
 const seed = 212//Math.floor(Math.random()*1000)
-console.log(seed)
+console.log(`rnd seed: ${seed}`)
 const config = {
     type: AUTO,
     width: 1024,

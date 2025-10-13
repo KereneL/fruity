@@ -317,7 +317,7 @@ export class BoardGameObject extends BaseGameObject {
                     this.board[boardX][boardY] = null;
                     tile.destroy();
                 })
-                console.log(`Done destroying all combos`)
+                this.log('log', `Done destroying all combos`);
                 this.applyGravity();
                 this.log('groupEnd');
                 this.log('groupEnd');
@@ -408,7 +408,7 @@ export class BoardGameObject extends BaseGameObject {
                 },
                 ...swapTweenConfigDefaults,
                 onComplete: () => {
-                    console.log("Complete Move")
+                    this.log('log', `Complete Move`);
                     const firstTileBoardX = firstTile.boardX
                     const firstTileBoardY = firstTile.boardY
                     firstTile.boardX = secondTile.boardX
@@ -427,7 +427,7 @@ export class BoardGameObject extends BaseGameObject {
         this.dropSelection();
     }
     endTurn() {
-        console.log("END TURN")
+        this.log('log', `END TURN`);
         this.enablePlayerInput();
         this.dropSelection();
 
