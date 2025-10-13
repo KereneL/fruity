@@ -42,9 +42,9 @@ export const TIME_CONSTS = {
     ease: 'Bounce.easeOut',
   },
   COMBO_DESTROY: {
-    duration: 300,
+    duration: 200,
     delay: 10,
-    completeDelay: 100,
+    completeDelay: 25,
     props: {
       alpha: {
         from: 1,
@@ -67,13 +67,12 @@ export const TIME_CONSTS = {
 export const STYLE_BOARD_RECT = {
   TILE_GAP: 8,
   EMITTER_CONFIG:   {
-            lifespan: 1000,
-            speed: { min: 200, max: 400, random: true, ease: 'Bounce.easeOut' },
+            lifespan: 600,
+            speed: { min: 150, max: 300, random: true, ease: 'Sine.easeOut' },
             alpha: { start: 1, end: 0, random: true, ease: 'Sine.easeIn'},
             scale: { start: 0, end: 2, random: true, ease: 'Sine.easeOut' },
             angle: { min: 0, max: 360 , random: true },
-            rotate: { start: 0, end: 1440, random: true },
-            gravityY: 200,
+            rotate: { start: 0, end: 360, random: true },
             emitting: false
         }
 }
