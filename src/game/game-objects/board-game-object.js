@@ -34,7 +34,6 @@ export class BoardGameObject extends BaseGameObject {
     disablePlayerInput() {
         this.acceptPlayerInput = false;
     }
-
     onBoardAction(type, eventObject) {
         switch (type) {
             case 'tile-interacted':
@@ -79,12 +78,8 @@ export class BoardGameObject extends BaseGameObject {
         const upperBound = -this.scene.cameras.main.displayHeight;
         appendedTiles.forEach((tile) => { tile.setY(upperBound); })
         this.gravityQueue.push(...appendedTiles);
-        const onCompleteCb = () => {
-            this.log('log', `Done appending Tiles.`)
-            this.log('groupCollapsed', `Check for Combos`)
-            this.checkForCombos();
-        }
-        this.tweenTilesDrop({ onComplete: onCompleteCb })
+
+        this.tweenTilesDrop()
     }
     getCell(column, row) {
         return ((
@@ -155,7 +150,25 @@ export class BoardGameObject extends BaseGameObject {
         }
 
     }
-    checkMoveValidity(attemptedMovePayload) {
+    checkMoveValidity(attemptedMovePayload){
+        const {firstTile,secondTile} = attemptedMovePayload
+        const { boardX: firstBoardX, boardY: firstBoardY } = firstTile;
+        const { boardX: secondBoardX, boardY: secondBoardY } = secondTile;
+
+        return (this.checkTilesProximity(attemptedMovePayload) && this.checkSwappedTilesForCombos(attemptedMovePayload)) 
+    }
+    checkSwappedTilesForCombos(attemptedMovePayload){
+        const {firstTile,secondTile} = attemptedMovePayload
+        const { boardX: firstBoardX, boardY: firstBoardY } = firstTile;
+        const { boardX: secondBoardX, boardY: secondBoardY } = secondTile;
+        this.board[firstBoardX][firstBoardY] = secondTile;
+        this.board[secondBoardX][secondBoardY] = firstTile;
+        const combos = this.checkForCombos();
+        this.board[firstBoardX][firstBoardY] = firstTile;
+        this.board[secondBoardX][secondBoardY] = secondTile;
+        return (combos.length > 0)
+    }
+    checkTilesProximity(attemptedMovePayload) {
         const { boardX: firstBoardX, boardY: firstBoardY } = attemptedMovePayload.firstTile;
         const { boardX: secondBoardX, boardY: secondBoardY } = attemptedMovePayload.secondTile;
 
@@ -174,6 +187,7 @@ export class BoardGameObject extends BaseGameObject {
         } else
             return false
     }
+
     log(...args) {
         this.scene.events.emit('log', 'checkForCombos', ...args)
     }
@@ -274,7 +288,11 @@ export class BoardGameObject extends BaseGameObject {
                 })
             })
         });
-
+        //this.destroyComboTiles(combos)
+        return combos
+    }
+    checkForCombosAfterMove(){
+        const combos = this.checkForCombos();
         if (combos.length > 0) {
             this.log('groupCollapsed', `Combos found: ${combos.length}`);
             this.destroyComboTiles(combos)
@@ -373,7 +391,7 @@ export class BoardGameObject extends BaseGameObject {
             },
             ...tileDropTweenConfigDefaults,
             ...tweenConfigExtra,
-            onComplete: () => { this.gravityQueue = []; this.checkForCombos() },
+            onComplete: () => { this.gravityQueue = []; this.checkForCombosAfterMove() },
             delay: this.scene.tweens.stagger(tileDropTweenConfigDefaults.staggerDelay, { ease: 'Linear' }),
         })
     }
@@ -423,14 +441,13 @@ export class BoardGameObject extends BaseGameObject {
         )
     }
     endMove() {
-        this.checkForCombos();
+        this.checkForCombosAfterMove();
         this.dropSelection();
     }
     endTurn() {
         this.log('log', `END TURN`);
         this.enablePlayerInput();
         this.dropSelection();
-
     }
     onInvalidMove(InvalidMovePayload) {
         const { TILE_SWAP: shakeTweenConfigDefaults } = TIME_CONSTS
