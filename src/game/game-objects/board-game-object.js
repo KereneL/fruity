@@ -14,6 +14,7 @@ export class BoardGameObject extends BaseGameObject {
 
         this.board = new Array(this.cellColumns)
         this.cellSize = { width: baseWidth * widthScale, height: baseHeight * heightScale }
+        this.gravityQueue = [];
 
         this.height = this.cellRows * this.cellSize.height + (this.cellRows - 1) * tileGap
         this.width = this.cellColumns * this.cellSize.width + (this.cellColumns - 1) * tileGap
@@ -71,39 +72,19 @@ export class BoardGameObject extends BaseGameObject {
                 }
             }
         }
-        this.appendTiles(appendedTiles)
+        this.appendNewTiles(appendedTiles)
     }
-    appendTiles(appendedTiles) {
+    appendNewTiles(appendedTiles) {
         const { TILE_DROP: tileDropTweenConfigDefaults } = TIME_CONSTS
-        this.scene.tweens.add({
-            targets: appendedTiles,
-            props: {
-                x: {
-                    getStart: (target, key, value) => {
-                        return this.getCellPositionX(target.boardX)
-                    },
-                },
-                y: {
-                    getActive: (target, key, value) => {
-                        const upperBound = this.scene.cameras.main.displayHeight;
-                        return -upperBound
-                    },
-                    getEnd: (target, key, value) => {
-                        return this.getCellPositionY(target.boardY)
-                    },
-                },
-            },
-            ...tileDropTweenConfigDefaults,
-            delay: this.scene.tweens.stagger(tileDropTweenConfigDefaults.staggerDelay, { ease: 'Linear' }),
-            onStart: () => {
-                this.log('log', `Now appending Tiles...`)
-            },
-            onComplete: () => {
-                this.log('log', `Done appending Tiles.`)
-                this.log('groupCollapsed', `Check for Combos`)
-                this.checkForCombos();
-            }
-        })
+        const upperBound = -this.scene.cameras.main.displayHeight;
+        appendedTiles.forEach((tile) => { tile.setY(upperBound); })
+        this.gravityQueue.push(...appendedTiles);
+        const onCompleteCb = () => {
+            this.log('log', `Done appending Tiles.`)
+            this.log('groupCollapsed', `Check for Combos`)
+            this.checkForCombos();
+        }
+        this.tweenTilesDrop({ onComplete: onCompleteCb })
     }
     getCell(column, row) {
         return ((
@@ -193,13 +174,14 @@ export class BoardGameObject extends BaseGameObject {
         } else
             return false
     }
-    log(...args){
-                this.scene.events.emit('log', 'checkForCombos', ...args)
+    log(...args) {
+        this.scene.events.emit('log', 'checkForCombos', ...args)
     }
     checkForCombos() {
-        let combos = [];
-        const verticalChecked = new Set();
-        const horizontalChecked = new Set();
+        const combos = [];
+        let verticalChecked = new Set();
+        let horizontalChecked = new Set();
+        
         for (let row = 0; row < this.cellRows; row++) {
             this.log('groupCollapsed', `ROW: ${row}`)
             for (let col = 0; col < this.cellColumns; col++) {
@@ -212,38 +194,38 @@ export class BoardGameObject extends BaseGameObject {
                 const verticallyCheckedThatTile = verticalChecked.has(currentTile)
                 verticalChecked.add(currentTile)
 
-                let comboV = [currentTile];
+                const comboV = new Set();
+                comboV.add(currentTile);
                 this.log('groupCollapsed', `CHECKING VERTICALLY? ${!verticallyCheckedThatTile}`)
                 for (let y = row + 1; y < this.cellRows; y++) {
-                    if (verticallyCheckedThatTile) {
-                        break;
-                    }
+                    if (verticallyCheckedThatTile) { break }
                     const tile = this.board[col][y];
-                    this.log('group',`(${col},${y}) IS TYPE:${tile.tileType.name}`)
+                    this.log('group', `(${col},${y}) IS TYPE:${tile.tileType.name}`)
 
                     if (tile && tile.tileType && tile.tileType === currentType) {
                         this.log('log', `IS MATCHING TYPE ${currentType.name}=${tile.tileType.name}`)
                         this.log('groupEnd');
-                        comboV.push(tile);
+                        comboV.add(tile);
                     } else {
                         this.log('log', `NOT MATCHING TYPE ${currentType.name}≠${tile.tileType.name}- BREAK SEARCH`)
                         this.log('groupEnd')
                         break;
                     }
                 }
-                if (comboV.length >= 3) {
-                    this.log('log',`COMBO FOUND OF LENGTH ${comboV.length}`);
-                    comboV.forEach((tile => verticalChecked.add(tile)))
+                if (comboV.size >= 3) {
+                    this.log('log', `COMBO FOUND OF LENGTH ${comboV.length}`);
+                    verticalChecked = verticalChecked.union(comboV)
                     combos.push(comboV);
                 } else {
-                    this.log('log',`NOT A COMBO (LENGTH ${comboV.length})`)
+                    this.log('log', `NOT A COMBO (LENGTH ${comboV.length})`)
                 }
                 this.log('groupEnd');
 
                 // check horizontally
                 const horizontallyCheckedThatTile = horizontalChecked.has(currentTile)
                 horizontalChecked.add(currentTile)
-                let comboH = [currentTile];
+                const comboH = new Set();
+                comboH.add(currentTile);
                 this.log('groupCollapsed', `CHECKING HORIZONTALLY? ${!horizontallyCheckedThatTile}`)
                 for (let x = col + 1; x < this.cellColumns; x++) {
                     if (horizontallyCheckedThatTile) {
@@ -255,7 +237,7 @@ export class BoardGameObject extends BaseGameObject {
                     if (tile && tile.tileType && tile.tileType === currentType) {
                         this.log('log', `MATCHING TYPE ${currentType.name}===${tile.tileType.name}`)
                         this.log('groupEnd');
-                        comboH.push(tile);
+                        comboH.add(tile);
                     } else {
                         this.log('log', `NOT MATCHING TYPE - BREAK SEARCH`)
                         this.log('groupEnd')
@@ -263,49 +245,67 @@ export class BoardGameObject extends BaseGameObject {
                     }
 
                 }
-                if (comboH.length >= 3) {
-                    this.log('log',`COMBO FOUND OF LENGTH ${comboH.length}`);
-                    comboH.forEach((tile => horizontalChecked.add(tile)))
+                if (comboH.size >= 3) {
+                    this.log('log', `COMBO FOUND OF LENGTH ${comboH.length}`);
+                    horizontalChecked = horizontalChecked.union(comboH)
                     combos.push(comboH);
                 } else {
-                    this.log('log',`NOT A COMBO (LENGTH ${comboH.length})`)
+                    this.log('log', `NOT A COMBO (LENGTH ${comboH.length})`)
                 }
                 this.log('groupEnd'); this.log('groupEnd');
-            }
-                        this.log('groupEnd')
+            }this.log('groupEnd');
+        }this.log('groupEnd');
 
-        }
-        this.log('groupEnd')
+        // for all combos, check
+        combos.forEach((thisCombo,comboIndx,combosArr)=>{
+            // each tile
+            thisCombo.forEach((tile)=>{
+                // against each other combo
+                combosArr.forEach((checkedCombo, ccIndx) => {
+                    // (but not itself)
+                    if (checkedCombo == thisCombo) return;
+                    // to see if it includes the same tile
+                    if (checkedCombo.has(tile)) {
+                        // if so, splice the array on which the same tile was found 
+                        const splicedCombo = combosArr.splice(ccIndx,1)[0];
+                        // and push all of it's tile to the thisCombo arr
+                        splicedCombo.forEach((tile)=>{thisCombo.add(tile)})
+                    }
+                })
+            })
+        });
+
         if (combos.length > 0) {
-            this.log('groupCollapsed',`Combos found: ${combos.length}`);
+            this.log('groupCollapsed', `Combos found: ${combos.length}`);
             this.destroyComboTiles(combos)
         } else {
-            this.log('groupCollapsed',`No combos found`);
+            this.log('groupCollapsed', `No combos found`);
             this.endTurn();
         }
     }
     destroyComboTiles(combos) {
         let tilesToRemove = [];
-        const { TILE_DESTROY: tileDestroyTweenConfigDefaults, COMBO_DESTROY: comboDestroyTweenConfigDefaults } = TIME_CONSTS    
+        const { TILE_DESTROY: tileDestroyTweenConfigDefaults, COMBO_DESTROY: comboDestroyTweenConfigDefaults } = TIME_CONSTS
         this.scene.tweens.chain({
             targets: null,
             tweens: combos.map((thisCombo, indx, arr) => {
+                const thisComboArr = Array.from(thisCombo)
                 return {
-                    targets: thisCombo,
+                    targets: thisComboArr,
                     ...comboDestroyTweenConfigDefaults,
-                    onStart: (tween, targets)=>{
-                        targets.forEach((tileInCombo)=>{
-                            const {x,y, tileType} = tileInCombo;
-                            const {spriteKey} = tileType
+                    onStart: (tween, targets) => {
+                        targets.forEach((tileInCombo) => {
+                            const { x, y, tileType } = tileInCombo;
+                            const { spriteKey } = tileType
                             this.emitter.setToTop()
                             this.emitter.setTexture(spriteKey)
-                            this.emitter.emitParticleAt(x,y,50)
+                            this.emitter.emitParticleAt(x, y, 50)
                         })
                     },
                     onComplete: () => {
-                        tilesToRemove.push(...thisCombo)
-                        
-                        this.log('log',`Done destroying combo #${indx + 1}`)
+                        tilesToRemove.push(...thisComboArr)
+
+                        this.log('log', `Done destroying combo #${indx + 1}`)
                     }
                 }
             }),
@@ -313,7 +313,7 @@ export class BoardGameObject extends BaseGameObject {
             delay: this.scene.tweens.stagger(tileDestroyTweenConfigDefaults.staggerDelay, { ease: 'Linear' }),
             onComplete: () => {
                 tilesToRemove.forEach((tile, indx) => {
-                    const {boardX, boardY} = tile;
+                    const { boardX, boardY } = tile;
                     this.board[boardX][boardY] = null;
                     tile.destroy();
                 })
@@ -324,7 +324,6 @@ export class BoardGameObject extends BaseGameObject {
             }
         })
     }
-
     applyGravity() {
         const cellsToApplyGravityTo = [];
         // Start from the last row (bottom)
@@ -351,9 +350,12 @@ export class BoardGameObject extends BaseGameObject {
                 }
             }
         }
-        this.tweenGravity(cellsToApplyGravityTo);
+        this.gravityQueue.push(...cellsToApplyGravityTo)
+        this.populateBoard();
     }
-    tweenGravity(cells) {
+    tweenTilesDrop(tweenConfigExtra) {
+        const cells = this.gravityQueue;
+        cells.sort((firstTile, secondTile) => secondTile.boardY - firstTile.boardY);
         const { TILE_DROP: tileDropTweenConfigDefaults } = TIME_CONSTS
         this.scene.tweens.add({
             targets: cells,
@@ -370,15 +372,13 @@ export class BoardGameObject extends BaseGameObject {
                 },
             },
             ...tileDropTweenConfigDefaults,
+            ...tweenConfigExtra,
+            onComplete: () => { this.gravityQueue = []; this.checkForCombos() },
             delay: this.scene.tweens.stagger(tileDropTweenConfigDefaults.staggerDelay, { ease: 'Linear' }),
-            onComplete: ()=>{
-                console.log(`Done with grav, now populate board`)
-                this.populateBoard();
-            }
         })
     }
     onValidMove(ValidMovePayload) {
-        const {TILE_SWAP: swapTweenConfigDefaults} = TIME_CONSTS
+        const { TILE_SWAP: swapTweenConfigDefaults } = TIME_CONSTS
         const { firstTile, secondTile } = ValidMovePayload;
         this.scene.tweens.add(
             {
@@ -433,7 +433,7 @@ export class BoardGameObject extends BaseGameObject {
 
     }
     onInvalidMove(InvalidMovePayload) {
-        const {TILE_SWAP: shakeTweenConfigDefaults} = TIME_CONSTS
+        const { TILE_SWAP: shakeTweenConfigDefaults } = TIME_CONSTS
         const orgX = InvalidMovePayload.secondTile.x;
         const shakeWidth = 12
         this.scene.tweens.add({
