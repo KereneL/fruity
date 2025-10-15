@@ -1,17 +1,8 @@
 import Phaser from 'phaser';
 import { BaseTile } from './base-tile';
 import { InputComponent } from '../components/input-component';
-import { STYLE_COLORS, STYLE_TILE_RECT } from '../consts';
-
-const FRUIT_TYPES = {
-  CHERRY: { name: '🔴', spriteKey: 'cherry', color: STYLE_COLORS.CHERRY, },
-  PINEAPPLE: { name: '🟠', spriteKey: 'pineapple', color: STYLE_COLORS.PINEAPPLE },
-  BANANA: { name: '🟡', spriteKey: 'banana', color: STYLE_COLORS.BANANA },
-  GREEN_APPLE: { name: '🟢', spriteKey: 'green-apple', color: STYLE_COLORS.GREEN_APPLE },
-  BLUEBERRIES: { name: '🔵', spriteKey: 'blueberries', color: STYLE_COLORS.BLUEBERRIES },
-  GRAPES: { name: '🟣', spriteKey: 'grapes', color: STYLE_COLORS.GRAPES },
-}
-const fruitTypesArr = [FRUIT_TYPES.CHERRY, FRUIT_TYPES.PINEAPPLE, FRUIT_TYPES.BANANA, FRUIT_TYPES.GREEN_APPLE, FRUIT_TYPES.BLUEBERRIES, FRUIT_TYPES.GRAPES];
+import { FRUIT_TYPES, STYLE_TILE_RECT } from '../consts';
+const fruitTypesArr = Object.values(FRUIT_TYPES);
 
 export class FruitTile extends BaseTile {
   constructor(scene, board, boardX = null, boardY = null) {
@@ -21,10 +12,8 @@ export class FruitTile extends BaseTile {
     this.name = this.tileType.name;
     this.isSelected = false;
     this.createTileBody();
-
     const inputConfig = { isEnabled: true, isHoverable: false, isDraggable: false, isClickable: false, isDropZone: false }
     this.addComponent(InputComponent, inputConfig)
-
     this.scene.events.on('board-action', this.onBoardAction, this)
   }
   getRandomizedFruitType() {

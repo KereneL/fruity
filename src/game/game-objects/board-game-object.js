@@ -1,12 +1,12 @@
 import Phaser from 'phaser';
 import { BaseGameObject } from './base-game-object';
 import { FruitTile } from './fruit-tile';
-import { STYLE_BOARD_RECT, STYLE_TILE_RECT, TIME_CONSTS } from '../consts';
+import { STYLE_BOARD_RECT, STYLE_TILE_RECT, TWEEN_CONFIGS } from '../consts';
 
 export class BoardGameObject extends BaseGameObject {
     constructor(scene, cellColumns, cellRows) {
         super(scene);
-        const { TILE_GAP: tileGap, EMITTER_CONFIG: emitterConfig } = STYLE_BOARD_RECT
+        const { TILE_GAP: tileGap, EMITTER_CONFIG_FRUIT: emitterConfigFruit, EMITTER_CONFIG_PARTICLE: emitterConfigParticle} = STYLE_BOARD_RECT
         const { BASE_WIDTH: baseWidth, BASE_HEIGHT: baseHeight, WIDTH_SCALE: widthScale, HEIGHT_SCALE: heightScale } = STYLE_TILE_RECT
         this.cellColumns = cellColumns
         this.cellRows = cellRows
@@ -21,7 +21,7 @@ export class BoardGameObject extends BaseGameObject {
         this.firstSelectedTile = null;
         this.secondSelectedTile = null;
 
-        this.emitter = this.scene.add.particles(0, 0, null, emitterConfig)
+        this.emitter = this.scene.add.particles(0, 0, null, emitterConfigFruit)
         this.add(this.emitter)
         this.buildBoard();
         this.populateBoard();
@@ -74,7 +74,7 @@ export class BoardGameObject extends BaseGameObject {
         this.appendNewTiles(appendedTiles)
     }
     appendNewTiles(appendedTiles) {
-        const { TILE_DROP: tileDropTweenConfigDefaults } = TIME_CONSTS
+        const { TILE_DROP: tileDropTweenConfigDefaults } = TWEEN_CONFIGS
         const upperBound = -this.scene.cameras.main.displayHeight;
         appendedTiles.forEach((tile) => { tile.setY(upperBound); })
         this.gravityQueue.push(...appendedTiles);
@@ -303,7 +303,8 @@ export class BoardGameObject extends BaseGameObject {
     }
     destroyComboTiles(combos) {
         let tilesToRemove = [];
-        const { TILE_DESTROY: tileDestroyTweenConfigDefaults, COMBO_DESTROY: comboDestroyTweenConfigDefaults } = TIME_CONSTS
+        const { TILE_DESTROY: tileDestroyTweenConfigDefaults, COMBO_DESTROY: comboDestroyTweenConfigDefaults } = TWEEN_CONFIGS
+        const { EMITTER_CONFIG_FRUIT: emitterConfigFruit, EMITTER_CONFIG_PARTICLE: emitterConfigParticle} = STYLE_BOARD_RECT
         this.scene.tweens.chain({
             targets: null,
             tweens: combos.map((thisCombo, indx, arr) => {
@@ -314,10 +315,18 @@ export class BoardGameObject extends BaseGameObject {
                     onStart: (tween, targets) => {
                         targets.forEach((tileInCombo) => {
                             const { x, y, tileType } = tileInCombo;
-                            const { spriteKey } = tileType
+                            const { spriteKey, color } = tileType
                             this.emitter.setToTop()
+
+                            this.emitter.setTexture('__WHITE')
+                            .setConfig(emitterConfigParticle)
+                            .setParticleTint(color.lighter)
+                            .emitParticleAt(x, y, 50);
+
                             this.emitter.setTexture(spriteKey)
-                            this.emitter.emitParticleAt(x, y, 50)
+                            .setConfig(emitterConfigFruit)
+                            .setParticleTint(0xffffff)
+                            .emitParticleAt(x, y, 50);
                         })
                     },
                     onComplete: () => {
@@ -374,7 +383,7 @@ export class BoardGameObject extends BaseGameObject {
     tweenTilesDrop(tweenConfigExtra) {
         const cells = this.gravityQueue;
         cells.sort((firstTile, secondTile) => secondTile.boardY - firstTile.boardY);
-        const { TILE_DROP: tileDropTweenConfigDefaults } = TIME_CONSTS
+        const { TILE_DROP: tileDropTweenConfigDefaults } = TWEEN_CONFIGS
         this.scene.tweens.add({
             targets: cells,
             props: {
@@ -396,7 +405,7 @@ export class BoardGameObject extends BaseGameObject {
         })
     }
     onValidMove(ValidMovePayload) {
-        const { TILE_SWAP: swapTweenConfigDefaults } = TIME_CONSTS
+        const { TILE_SWAP: swapTweenConfigDefaults } = TWEEN_CONFIGS
         const { firstTile, secondTile } = ValidMovePayload;
         this.scene.tweens.add(
             {
@@ -450,7 +459,7 @@ export class BoardGameObject extends BaseGameObject {
         this.dropSelection();
     }
     onInvalidMove(InvalidMovePayload) {
-        const { TILE_SWAP: shakeTweenConfigDefaults } = TIME_CONSTS
+        const { TILE_SWAP: shakeTweenConfigDefaults } = TWEEN_CONFIGS
         const orgX = InvalidMovePayload.secondTile.x;
         const shakeWidth = 12
         this.scene.tweens.add({
